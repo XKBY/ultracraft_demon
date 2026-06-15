@@ -10,7 +10,7 @@ public class ServerConfig extends Config
 	public final EnumEntry<ProjectileBoostSetting> projboost = new EnumEntry<>("ProjectileBoost", ProjectileBoostSetting.LIMITED);
 	public final EnumEntry<Setting> hivel = new EnumEntry<>("HiVelMode", Setting.FREE);
 	public final EnumEntry<Setting> timestop = new EnumEntry<>("TimeStop", Setting.FORCE_OFF).setValidOptions(new Setting[] {Setting.FORCE_ON, Setting.FORCE_OFF});
-	public final EnumEntry<RegenSetting> bloodHeal = new EnumEntry<>("BloodHeal", RegenSetting.ALWAYS);
+	public final EnumEntry<RegenSetting> bloodHeal = new EnumEntry<>("BloodHeal", RegenSetting.NEVER);
 	public final EnumEntry<GraffitiSetting> graffiti = new EnumEntry<>("Graffiti", GraffitiSetting.ALLOW_ALL);
 	public final BooleanEntry disableHandswap = new BooleanEntry("DisableHandswap", false);
 	public final BooleanEntry effectivelyViolent = new BooleanEntry("EffectivelyViolent", false);

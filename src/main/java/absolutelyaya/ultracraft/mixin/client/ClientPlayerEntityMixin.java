@@ -100,9 +100,11 @@ public abstract class ClientPlayerEntityMixin extends AbstractClientPlayerEntity
 	boolean grounded, dashPressed, wasDashPressed, slidePressed, wasSlidePressed, slamming, wasSlamming, strongSlam, slamStored, wasJumping,
 			wasHivel, slideStartedSideways;
 	int slamTicks, curSlamCooldown, slamJumpTimer, coyote, curSlidePreservationTicks, slideTicks, curWallJumps, disableJumpTicks;
-	int slamCooldown = 5, slamJumpWindow = 4, coyoteThreshold = 4, slidePreservationTicks = 5, slideSlowdownTicks = 20, wallJumps = 3,
+	int slamCooldown = 5, slamJumpWindow = 4, coyoteThreshold = 4, slidePreservationTicks = 5, slideSlowdownTicks = 20, wallJumps = 0,
 			slamDisableJumpTicks = 8;
 	float screenshake = 0f, slideVelocity;
+	//Hi-vel underwater vertical movement: Space ascends fast, Ctrl(slide) descends a limited distance then stops.
+	float waterAscendVelocity = 0.35f, waterDescendVelocity = 0.35f, waterDescendDistance = 50f, waterDescendRemaining = 50f, waterSinkVelocity = 0.15f;
 	float hivelSpeed, slamVelocity = 2f, baseSlideVelocity = 0.35f, baseJumpVelocity = 0.42f, dashVelocity = 1f, skeweredDashVelocity = 0.05f,
 			dashSlipAndSlideThreshold = 0.6f, dashSlipAndSlideReduction = 0.5f, dashAirStopVelocityMultiplier = 0.3f,
 			skeweredDashAirStopVelocityMultiplier = 0.03f, slideJumpSpeedBonus = 0.025f, slideSpeedSoftCap = 0.99f, slideSlowdownMultiplier = 0.95f,
@@ -246,7 +248,7 @@ public abstract class ClientPlayerEntityMixin extends AbstractClientPlayerEntity
 			//slide
 			if(slidePressed && !wasSlidePressed && !slamming)
 			{
-				if(!isGrounded(slideStartGroundTolerance) && !verticalCollision && curSlamCooldown == 0) //start slam
+				if(!isGrounded(slideStartGroundTolerance) && !verticalCollision && curSlamCooldown == 0 && !isTouchingWater()) //start slam
 				{
 					hivel.cancelDash();
 					slamTicks = 0;
@@ -356,16 +358,54 @@ public abstract class ClientPlayerEntityMixin extends AbstractClientPlayerEntity
 			getWorld().getBlockCollisions(this, getBoundingBox().expand(0.1f, 0, 0f)).forEach(touchingWalls::add); //x-axis wall check
 			getWorld().getBlockCollisions(this, getBoundingBox().expand(0f, 0, 0.1f)).forEach(touchingWalls::add); //z-axis wall check
 			boolean isTouchingWall = touchingWalls.size() > 0;
-			if(!slamming && !hivel.isSliding() && isTouchingWall && !grounded)
+			//wall slide (also gated by the wallJumps config so that setting it to 0 fully disables the wall ability, not just the jump)
+			if(wallJumps > 0 && !slamming && !hivel.isSliding() && isTouchingWall && !grounded)
 			{
 				Vec3d vel = getVelocity();
 				setVelocity(new Vec3d(vel.x, Math.max(vel.y, -wallSlideVelocity), vel.z));
 			}
-			//wall jump
-			if(curWallJumps > 0 && !isGrounded(0.5f) && jumping && !wasJumping && !lastOnGround && isTouchingWall &&
+			//wall jump (also gated directly by the wallJumps config so a value of 0 fully disables it, even before/without a config sync)
+			if(wallJumps > 0 && curWallJumps > 0 && !isGrounded(0.5f) && jumping && !wasJumping && !lastOnGround && isTouchingWall &&
 					   (UltracraftClient.isSlamStorageEnabled() || !slamming) && !hivel.isSliding())
 				wallJump(touchingWalls, hivel);
-			
+
+			//Underwater vertical control (overrides the slam/jump vertical, only in water, dashing keeps its own velocity):
+			//Space ascends fast, Ctrl(slide) descends a limited distance (~4-5 blocks) then stops, otherwise hover (no infinite sink).
+			if(isTouchingWater() && !hivel.isDashing())
+			{
+				if(slamming)
+					setSlammingClient(false);
+				Vec3d v = getVelocity();
+				if(jumping)
+				{
+					setVelocity(v.x, waterAscendVelocity, v.z);
+					waterDescendRemaining = waterDescendDistance;
+				}
+				else if(slidePressed && waterDescendRemaining > 0f)
+				{
+					setVelocity(v.x, -waterDescendVelocity, v.z);
+					waterDescendRemaining -= waterDescendVelocity;
+				}
+				else if(isSubmergedInWater())
+				{
+					//Submerged = swimming: hover at the current depth (stop sinking) so the player floats instead of dropping to the bottom.
+					double ny = v.y * 0.5;
+					if(ny < 0d && ny > -0.02d)
+						ny = 0d;
+					setVelocity(v.x, ny, v.z);
+					if(!slidePressed)
+						waterDescendRemaining = waterDescendDistance;
+				}
+				else
+				{
+					//Not submerged yet (just entered from the surface): actively sink in instead of skating on top, so even a
+					//fast-moving player gets pulled under. Once the head goes under, the submerged branch above takes over and hovers.
+					setVelocity(v.x, Math.min(v.y, -waterSinkVelocity), v.z);
+					if(!slidePressed)
+						waterDescendRemaining = waterDescendDistance;
+				}
+			}
+
 			//stop ignoring slowdown and increasing slowdown
 			if((verticalCollision && grounded) && !hivel.isDashing())
 			{

@@ -32,7 +32,6 @@ import net.minecraft.item.Items;
 import net.minecraft.registry.Registries;
 import net.minecraft.text.Text;
 import net.minecraft.util.Arm;
-import net.minecraft.util.Hand;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.Pair;
 import net.minecraft.util.math.MathHelper;
@@ -50,10 +49,11 @@ public class UltraHudRenderer
 	private static final Vector3f[] STYLE_OFFSETS = new Vector3f[] { new Vector3f(-43, -5, 40), new Vector3f(-2, -5, 20), new Vector3f(2, 0, 0) };
 	private static final ClientConfig config = UltracraftClient.getConfig();
 	final Identifier GUI_TEXTURE = Ultracraft.texIdentifier("textures/gui/ultrahud");
+	final Identifier GUI_TEXTURE_HIVEL = Ultracraft.texIdentifier("textures/gui/ultrahud_2");
 	final Identifier STYLE_TEXTURE = Ultracraft.texIdentifier("textures/gui/style");
 	final Identifier WEAPONS_TEXTURE = Ultracraft.texIdentifier("textures/gui/weapon_icons");
 	final Identifier CROSSHAIR_TEXTURE = Ultracraft.texIdentifier("textures/gui/crosshair_stats");
-	float healthPercent, staminaPercent, absorptionPercent, yOffset;
+	float healthPercent, staminaPercent, absorptionPercent, hungerPercent, hiVelTexTransition;
 	static float fishTimer, coinTimer, coinRot = 0, coinRotDest = 0, wingHintDisplayTimer, whitelistHintDisplayTimer, styleTimer;
 	static ItemStack lastCatch;
 	static int coinCombo;
@@ -62,7 +62,7 @@ public class UltraHudRenderer
 	
 	public void render(float delta, Camera cam)
 	{
-		if(!MinecraftClient.isHudEnabled() ||cam.isThirdPerson() || config.ultraHudVisibility.equals(UltraHudVisibility.NEVER))
+		if(!MinecraftClient.isHudEnabled() || config.ultraHudVisibility.equals(UltraHudVisibility.NEVER))
 			return;
 		MinecraftClient client = MinecraftClient.getInstance();
 		ClientPlayerEntity player = client.player;
@@ -78,7 +78,12 @@ public class UltraHudRenderer
 		boolean wingsActive = wings.isActive();
 		if(config.ultraHudVisibility.equals(UltraHudVisibility.LIMITED) && !wingsActive)
 			return;
-		
+
+		//We now render in the 2D HUD pass (so the HUD draws on top of the first-person hand). That pass leaves a GUI
+		//z-offset on the model-view stack, which would push our perspective content out of view, so reset it to identity.
+		RenderSystem.getModelViewStack().push();
+		RenderSystem.getModelViewStack().loadIdentity();
+		RenderSystem.applyModelViewMatrix();
 		RenderSystem.disableDepthTest();
 		RenderSystem.disableCull();
 		MatrixStack matrices = new MatrixStack();
@@ -90,8 +95,11 @@ public class UltraHudRenderer
 		RenderSystem.enableBlend();
 		
 		healthPercent = MathHelper.lerp(delta, healthPercent, player.getHealth() / player.getMaxHealth());
+		hungerPercent = MathHelper.lerp(delta, hungerPercent, player.getHungerManager().getFoodLevel() / 20f);
 		staminaPercent = MathHelper.lerp(delta, staminaPercent, UltraComponents.HIVEL.get(player).getStamina() / 90f);
 		absorptionPercent = MathHelper.lerp(delta, absorptionPercent, Math.min(player.getAbsorptionAmount() / 20f, 1f));
+		//Fade the HUD texture toward the hi-vel variant while wings are active, and back when they're not.
+		hiVelTexTransition = MathHelper.lerp(MathHelper.clamp(delta * 0.25f, 0f, 1f), hiVelTexTransition, wingsActive ? 1f : 0f);
 		//Crosshair
 		if(config.ultraHudCrosshair)
 		{
@@ -112,6 +120,9 @@ public class UltraHudRenderer
 		
 		if(whitelistHintDisplayTimer > 0.001f)
 			whitelistHintDisplayTimer -= delta / 20f;
+
+		RenderSystem.getModelViewStack().pop();
+		RenderSystem.applyModelViewMatrix();
 	}
 	
 	public void renderHotbar(MatrixStack matrices, MinecraftClient client, Camera cam, ClientPlayerEntity player, boolean wingsActive, float delta)
@@ -130,109 +141,79 @@ public class UltraHudRenderer
 		if(config.switchSides)
 			matrices.translate(0, -30, 0);
 		matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(flip ? -10 : 10));
-		if(config.moveUltrahud)
-		{
-			Hand leftHand = player.getMainArm().equals(Arm.LEFT) ? Hand.MAIN_HAND : Hand.OFF_HAND;
-			Hand rightHand = leftHand.equals(Hand.OFF_HAND) ? Hand.MAIN_HAND : Hand.OFF_HAND;
-			boolean covered = (!(player.getStackInHand(leftHand).isEmpty()) && !flip) || (!player.getStackInHand(rightHand).isEmpty() && flip);
-			matrices.translate(0f, yOffset = MathHelper.lerp(delta, yOffset, covered ? 30f + (config.switchSides ? 30 : 0) : 0f), 0f);
-		}
-		
+
 		matrices.push();
-		RenderSystem.setShaderTexture(0, GUI_TEXTURE);
-		matrices.translate(-24, -36, 0f);
-		int guiScale = Math.min(client.options.getGuiScale().getValue(), 4);
+		matrices.translate(-28, -36, 0f);
+		int guiScale = Math.min(client.options.getGuiScale().getValue(), 3);
 		if(guiScale == 0)
 			guiScale = 3;
-		float scale = guiScale * 0.2f;
+		float scale = guiScale * 0.15f;
 		matrices.scale(scale, scale, scale);
-		//main box
 		Matrix4f textureMatrix = new Matrix4f(matrices.peek().getPositionMatrix());
-		RenderingUtil.drawTexture(textureMatrix, new Vector4f(0, 0, 48f, 48f), 0f,
-				new Vec2f(80f, 64f), new Vector4f(0f, 0f, 48f, 48f), 0.75f);
-		//bars
-		//health
-		RenderingUtil.drawTexture(textureMatrix, new Vector4f(2, 8, 44 * healthPercent, 4), 0f,
-				new Vec2f(80f, 64f), new Vector4f(2f, 48f, 44f * healthPercent, 4f), 1f);
-		if(absorptionPercent > 0f)
-			RenderingUtil.drawTexture(textureMatrix, new Vector4f(2, 8, 44 * absorptionPercent, 4), 0f,
-					new Vec2f(80f, 64f), new Vector4f(2f, 56f, 44f * absorptionPercent, 4f), 1f);
-		//stamina
-		RenderingUtil.drawTexture(textureMatrix, new Vector4f(2, 2, 44 * staminaPercent, 4), 0f,
-				new Vec2f(80f, 64f), new Vector4f(2f, 52f, 44f * staminaPercent, 4f), 1f);
-		//Railgun
-		if(false) //if hasRailgun
-		{
-			RenderingUtil.drawTexture(textureMatrix, new Vector4f(49, 15, 15, 33), 0f,
-					new Vec2f(80f, 64f), new Vector4f(49f, 0f, 15f, 33f), 0.75f);
-			RenderingUtil.drawTexture(textureMatrix, new Vector4f(52, 18, 9, 27), 0f,
-					new Vec2f(80f, 64f), new Vector4f(68f, 3f, 9f, 27f), 1f);
-		}
-		//Arm
 		IArmComponent arms = UltraComponents.ARMS.get(player);
-		if(arms.getUnlockedArmCount() > 1)
+		//Crossfade the panel between the default texture and the hi-vel texture based on the transition progress.
+		if(hiVelTexTransition < 0.999f)
 		{
-			RenderingUtil.drawTexture(textureMatrix, new Vector4f(49, 0, 15, 14), 0f,
-					new Vec2f(80f, 64f), new Vector4f(49f, 34f, 15f, 14f), 0.75f);
-			RenderingUtil.drawTexture(textureMatrix, new Vector4f(51, 2f, 11, 10), 0f,
-					new Vec2f(80f, 64f), new Vector4f(47f + 11 * arms.getActiveArm(), 48f, 11f, 10f), 1f);
+			RenderSystem.setShaderTexture(0, GUI_TEXTURE);
+			drawHudPanel(textureMatrix, arms, 1f - hiVelTexTransition);
 		}
-		
-		matrices.pop();
-		ItemStack mainHand = player.getMainHandStack();
-		boolean sprite = shouldRenderSpriteInstead(mainHand.getItem());
-		if(!sprite)
-			RenderSystem.restoreProjectionMatrix();
-		if(config.moveUltrahud)
-			matrices.translate(0f, yOffset / 3f - (config.switchSides ? 7 : 0), 0f);
-		//UltraHotbar
-		matrices.push();
-		matrices.translate((-21 - (3 - guiScale) * 8) * (flip ? -1.5 : 1), -24 - (3 - guiScale) * 8.5f, -50);
-		matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(flip ? -10f : 10f));
-		matrices.scale(scale, scale, scale);
-		matrices.scale(30f, 30f, 5f);
-		if(flip)
-			matrices.translate(-1.75, 0, 0);
-		VertexConsumerProvider.Immediate immediate = client.getBufferBuilders().getEntityVertexConsumers();
-		Matrix3f normal = matrices.peek().getNormalMatrix();
-		normal.set(new Quaternionf().rotateXYZ((float)Math.toRadians(cam.getPitch()), (float)Math.toRadians(cam.getYaw()), 0f));
-		matrices.push();
-		matrices.scale(0.5f, 0.5f, 0.5f);
-		matrices.translate(1.2, -0.25, 0);
-		
-		RenderSystem.setShaderColor(0.5f, 0.5f, 0.5f, 1f);
-		ItemStack stack = player.getInventory().getStack((player.getInventory().selectedSlot + 1) % 9);
-		if(!sprite)
-			drawItem(matrices, textureMatrix, client, immediate, stack, false); // right
-		int lastSlot = (player.getInventory().selectedSlot - 1) % 9;
-		stack = player.getInventory().getStack(lastSlot == -1 ? 8 : lastSlot);
-		matrices.translate(-2.5f, 0f, 0f);
-		//matrices.multiply(new Quaternionf(new AxisAngle4f(0.18f, 0f, 1f * (flip ? -1 : 1), 0f)));
-		if(!sprite)
-			drawItem(matrices, textureMatrix, client, immediate, stack, false); // left
-		matrices.pop();
-		matrices.translate(0f, 0f, 0.5f);
-		RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
-		drawItem(matrices, textureMatrix, client, immediate, mainHand, true); // middle
-		
-		matrices.pop();
-		
+		if(hiVelTexTransition > 0.001f)
+		{
+			RenderSystem.setShaderTexture(0, GUI_TEXTURE_HIVEL);
+			drawHudPanel(textureMatrix, arms, hiVelTexTransition);
+		}
+
+		//Hi-vel toggle hint text. Rendered inside the panel's own coordinate space (still in the HUD's perspective
+		//projection) so it stays anchored just above the panel and scales together with it at every GUI scale, instead of
+		//scaling around an off-screen pivot. Panel space spans x 0..96, y 0..60 with +y up, so "above the HUD" is y > 60.
 		if(wingHintDisplayTimer > 0.001f)
 		{
-			matrices.scale(0.25f, -0.25f, -1f);
-			if(config.moveUltrahud)
-				matrices.translate(0f, yOffset * 1.75f - (config.switchSides ? 7 : 0), 0f);
-			matrices.translate(0, 0, 10);
 			Text t = Text.translatable(wingsActive ? "message.ultracraft.hi-vel.enable" : "message.ultracraft.hi-vel.disable");
 			if(whitelistHintDisplayTimer > 0.001f)
 				t = Text.translatable("message.ultracraft.hi-vel.whitelist");
-			drawText(matrices, t,
-					flip ? -150 : -50, 14, MathHelper.clamp(wingHintDisplayTimer, 0.05f, 1f), false);
+			matrices.push();
+			matrices.translate(48f, 68f, 1f);   //centered over the 96-wide panel, just above its 60-tall top edge
+			matrices.scale(0.5f, -0.5f, 0.5f);  //flip Y for upright text and scale it relative to the panel
+			drawText(matrices, t, 0f, 0f, MathHelper.clamp(wingHintDisplayTimer, 0.05f, 1f), true);
+			client.getBufferBuilders().getEntityVertexConsumers().draw(); //flush while the perspective projection is bound
+			matrices.pop();
 			wingHintDisplayTimer -= delta / 20f;
 		}
+
+		matrices.pop();
+		RenderSystem.restoreProjectionMatrix();
 		matrices.pop();
 	}
-	
+
+	//Draws the HUD box, bars and arm indicator from the currently-bound texture, with every layer's alpha scaled by `am`
+	//so the two textures can be crossfaded during the hi-vel transition.
+	void drawHudPanel(Matrix4f textureMatrix, IArmComponent arms, float am)
+	{
+		//main box
+		RenderingUtil.drawTexture(textureMatrix, new Vector4f(0, 0, 96f, 60f), 0f,
+				new Vec2f(160f, 128f), new Vector4f(0f, 0f, 96f, 60f), 0.75f * am);
+		//health
+		RenderingUtil.drawTexture(textureMatrix, new Vector4f(8, 22, 70 * healthPercent, 14), 0f,
+				new Vec2f(160f, 128f), new Vector4f(8f, 64f, 70f * healthPercent, 14f), am);
+		//hunger
+		RenderingUtil.drawTexture(textureMatrix, new Vector4f(5, 2, 74 * hungerPercent, 16), 0f,
+				new Vec2f(160f, 128f), new Vector4f(5f, 108f, 74f * hungerPercent, 16f), am);
+		if(absorptionPercent > 0f)
+			RenderingUtil.drawTexture(textureMatrix, new Vector4f(8, 22, 70 * absorptionPercent, 14), 0f,
+					new Vec2f(160f, 128f), new Vector4f(8f, 95f, 70f * absorptionPercent, 14f), am);
+		//stamina
+		RenderingUtil.drawTexture(textureMatrix, new Vector4f(22, 9, 69 * staminaPercent, 17), 0f,
+				new Vec2f(160f, 128f), new Vector4f(22f, 78f, 69f * staminaPercent, 17f), am);
+		//arm
+		if(arms.getUnlockedArmCount() > 1)
+		{
+			RenderingUtil.drawTexture(textureMatrix, new Vector4f(49, 0, 15, 14), 0f,
+					new Vec2f(80f, 64f), new Vector4f(49f, 34f, 15f, 14f), 0.75f * am);
+			RenderingUtil.drawTexture(textureMatrix, new Vector4f(51, 2f, 11, 10), 0f,
+					new Vec2f(80f, 64f), new Vector4f(47f + 11 * arms.getActiveArm(), 48f, 11f, 10f), am);
+		}
+	}
+
 	public void renderStyle(MatrixStack matrices, MinecraftClient client, ClientPlayerEntity player, float delta, float alpha)
 	{
 		RenderSystem.disableDepthTest();
@@ -351,9 +332,13 @@ public class UltraHudRenderer
 		ClientPlayerEntity player = client.player;
 		if(player == null)
 			return;
+		//Reset the GUI z-offset left on the model-view stack by the 2D HUD pass, otherwise this perspective content is pushed out of view.
+		RenderSystem.getModelViewStack().push();
+		RenderSystem.getModelViewStack().loadIdentity();
+		RenderSystem.applyModelViewMatrix();
 		RenderSystem.disableDepthTest();
 		RenderSystem.disableCull();
-		
+
 		MatrixStack matrices = new MatrixStack();
 		int width = client.getWindow().getFramebufferWidth();
 		int height = client.getWindow().getFramebufferHeight();
@@ -439,8 +424,10 @@ public class UltraHudRenderer
 		}
 		matrices.pop();
 		RenderSystem.restoreProjectionMatrix();
+		RenderSystem.getModelViewStack().pop();
+		RenderSystem.applyModelViewMatrix();
 	}
-	
+
 	boolean shouldRenderSpriteInstead(Item item)
 	{
 		return (item instanceof AbstractWeaponItem weapon && weapon.getHUDTexture() != null) || item instanceof MachineSwordItem || item instanceof PlushieItem || item instanceof BlahajItem || item instanceof FlorpItem;
@@ -506,10 +493,10 @@ public class UltraHudRenderer
 			float x1 = x - (centered ? client.textRenderer.getWidth(lines[i]) / 2f : 0);
 			float y1 = y + (client.textRenderer.fontHeight + 2) * i;
 			client.textRenderer.draw(Text.of(lines[i]), x1, y1, Color.ofRGBA(1f, 1f, 1f, alpha).getColor(), false,
-					matrix, immediate, TextRenderer.TextLayerType.NORMAL, Color.ofRGBA(0f, 0f, 0f, 0.5f * alpha).getColor(), 15728880);
+					matrix, immediate, TextRenderer.TextLayerType.SEE_THROUGH, Color.ofRGBA(0f, 0f, 0f, 0.5f * alpha).getColor(), 15728880);
 			matrix.translate(0f, 0f, -0.1f);
 			client.textRenderer.draw(Text.of(lines[i]), x1, y1, Color.ofRGBA(1f, 1f, 1f, alpha).getColor(), false,
-					matrix, immediate, TextRenderer.TextLayerType.NORMAL, 0, 15728880);
+					matrix, immediate, TextRenderer.TextLayerType.SEE_THROUGH, 0, 15728880);
 		}
 	}
 	
@@ -526,7 +513,7 @@ public class UltraHudRenderer
 			float x1 = x - (centered ? client.textRenderer.getWidth(lines[i]) / 2f : 0);
 			float y1 = y + (client.textRenderer.fontHeight + 2) * i;
 			client.textRenderer.draw(Text.of(lines[i]), x1, y1, Color.ofRGBA(1f, 1f, 1f, alpha).getColor(), false,
-					matrix, immediate, TextRenderer.TextLayerType.NORMAL, 0, 15728880);
+					matrix, immediate, TextRenderer.TextLayerType.SEE_THROUGH, 0, 15728880);
 		}
 	}
 	
@@ -536,16 +523,16 @@ public class UltraHudRenderer
 		VertexConsumerProvider.Immediate immediate = client.getBufferBuilders().getEntityVertexConsumers();
 		Matrix4f matrix = matrices.peek().getPositionMatrix();
 		client.textRenderer.draw(text, x, y, Color.ofRGBA(1f, 1f, 1f, alpha).getColor(), false,
-				matrix, immediate, TextRenderer.TextLayerType.NORMAL, 0, 15728880);
+				matrix, immediate, TextRenderer.TextLayerType.SEE_THROUGH, 0, 15728880);
 		matrix.translate(0f, 0f, 0.5f);
 		client.textRenderer.draw(text, x, y - 1, Color.ofRGBA(0f, 0f, 0f, alpha).getColor(), false,
-				matrix, immediate, TextRenderer.TextLayerType.NORMAL, 0, 15728880);
+				matrix, immediate, TextRenderer.TextLayerType.SEE_THROUGH, 0, 15728880);
 		client.textRenderer.draw(text, x, y + 1, Color.ofRGBA(0f, 0f, 0f, alpha).getColor(), false,
-				matrix, immediate, TextRenderer.TextLayerType.NORMAL, 0, 15728880);
+				matrix, immediate, TextRenderer.TextLayerType.SEE_THROUGH, 0, 15728880);
 		client.textRenderer.draw(text, x - 1, y, Color.ofRGBA(0f, 0f, 0f, alpha).getColor(), false,
-				matrix, immediate, TextRenderer.TextLayerType.NORMAL, 0, 15728880);
+				matrix, immediate, TextRenderer.TextLayerType.SEE_THROUGH, 0, 15728880);
 		client.textRenderer.draw(text, x + 1, y, Color.ofRGBA(0f, 0f, 0f, alpha).getColor(), false,
-				matrix, immediate, TextRenderer.TextLayerType.NORMAL, 0, 15728880);
+				matrix, immediate, TextRenderer.TextLayerType.SEE_THROUGH, 0, 15728880);
 	}
  
 	public static void onUpdateWingsActive()

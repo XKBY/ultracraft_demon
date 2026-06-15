@@ -109,7 +109,30 @@ public class UltracraftClient implements ClientModInitializer
 	static LevelHUD levelHUD;
 	static CybergrindHUD cybergrindHUD;
 	static ConfigHolder<ClientConfig> config;
-	
+
+	//Rendered from IngameHudMixin right before the chat, so the UltraHUD draws over the first-person hand (offhand item)
+	//but still stays below chat, info popups and toasts.
+	public static void renderUltraHud(float tickDelta)
+	{
+		if(hudRenderer != null)
+			hudRenderer.render(tickDelta, MinecraftClient.getInstance().gameRenderer.getCamera());
+	}
+
+	//True when this Fabric mod is actually running on Forge (e.g. via Sinytra Connector), detected by the presence of a
+	//Forge-only class. Used to avoid registering custom non-chunk block render layers that Forge hard-rejects.
+	public static boolean isForgeLikePlatform()
+	{
+		try
+		{
+			Class.forName("net.minecraftforge.fml.loading.FMLLoader");
+			return true;
+		}
+		catch(Throwable e)
+		{
+			return false;
+		}
+	}
+
 	@Override
 	public void onInitializeClient()
 	{
@@ -217,7 +240,6 @@ public class UltracraftClient implements ClientModInitializer
 		});
 		
 		hudRenderer = new UltraHudRenderer();
-		WorldRenderEvents.END.register((context) -> hudRenderer.render(context.tickDelta(), context.camera()));
 		weaponInfoHUD = new WeaponInfoHUD();
 		editModeHUD = new EditModeHUD();
 		titleHUD = new TitleHUD();
@@ -378,8 +400,11 @@ public class UltracraftClient implements ClientModInitializer
 		FluidRenderHandlerRegistry.INSTANCE.register(FluidRegistry.STILL_BLOOD, FluidRegistry.Flowing_BLOOD,
 				new SimpleFluidRenderHandler(Ultracraft.identifier("block/blood_still"), Ultracraft.identifier("block/blood_flow")));
 		BlockRenderLayerMap.INSTANCE.putFluids(RenderLayer.getTranslucent(), FluidRegistry.STILL_BLOOD, FluidRegistry.Flowing_BLOOD);
-		BlockRenderLayerMap.INSTANCE.putBlock(BlockRegistry.FLESH, //prevent Sodium from crashing when trying to render Flesh Blocks
-				SODIUM ? RenderLayers.getSolid() : RenderLayers.getFlesh());
+		//The custom Flesh render layer is a non-chunk layer that only works with vanilla Fabric's lenient chunk rendering.
+		//Sodium rejects it, and Forge (e.g. under Sinytra Connector) hard-validates block render layers against the vanilla
+		//chunk layers and crashes on it, so fall back to a plain solid chunk layer on those platforms.
+		BlockRenderLayerMap.INSTANCE.putBlock(BlockRegistry.FLESH,
+				(SODIUM || isForgeLikePlatform()) ? RenderLayer.getSolid() : RenderLayers.getFlesh());
 		BlockRenderLayerMap.INSTANCE.putBlock(BlockRegistry.ADORNED_RAILING, RenderLayer.getCutout());
 		BlockRenderLayerMap.INSTANCE.putBlock(BlockRegistry.VENT_COVER, RenderLayer.getCutout());
 		BlockRenderLayerMap.INSTANCE.putBlock(BlockRegistry.SLAB_BLOCK, RenderLayer.getCutout());

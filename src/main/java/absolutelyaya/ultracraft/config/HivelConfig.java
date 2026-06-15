@@ -11,8 +11,8 @@ public class HivelConfig extends Config
 	public final BooleanEntry fallDamage = new BooleanEntry("FallDamage", false);
 	public final BooleanEntry drowning = new BooleanEntry("Drowning", false);
 	public final BooleanEntry storage = new BooleanEntry("SlamStorage", true);
-	public final FloatEntry speed = new FloatEntry("Speed", 1.4f);
-	public final FloatEntry gravity = (FloatEntry)new FloatEntry("Gravity", 0.5f).setRange(0f, 1f);
+	public final FloatEntry speed = new FloatEntry("Speed", 1.7f);
+	public final FloatEntry gravity = (FloatEntry)new FloatEntry("Gravity", 1.0f).setRange(0f, 1f);
 	public final IntegerEntry iFrames = new IntegerEntry("IFrames", 2);
 	
 	public final IntegerEntry slamCooldown = new IntegerEntry("slamCooldown", 5);
@@ -20,7 +20,7 @@ public class HivelConfig extends Config
 	public final IntegerEntry coyoteThreshold = new IntegerEntry("coyoteThreshold", 4);
 	public final IntegerEntry slidePreservationTicks = new IntegerEntry("slidePreservationTicks", 5);
 	public final IntegerEntry slideSlowdownTicks = new IntegerEntry("slideSlowdownTicks", 20);
-	public final IntegerEntry wallJumps = new IntegerEntry("wallJumps", 3);
+	public final IntegerEntry wallJumps = new IntegerEntry("wallJumps", 0);
 	public final IntegerEntry slamDisableJumpTicks = new IntegerEntry("slamDisableJumpTicks", 8);
 	public final FloatEntry drag = new FloatEntry("MoveTechSlowdown", 1f);
 	public final FloatEntry dragVelocitySoftcap = new FloatEntry("MoveTechVelocitySoftcap", 0.4f);

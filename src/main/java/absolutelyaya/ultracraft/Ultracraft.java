@@ -259,39 +259,14 @@ public class Ultracraft implements ModInitializer
     
     public static boolean checkSupporter(UUID uuid, boolean client)
     {
-        int i;
-        if(supporterCache.containsKey(uuid) && (i = supporterCache.get(uuid)) != 0)
-            return i == -1;
-        boolean supporter = false;
-        JsonObject json = fetchSupporterList();
-        if(json == null)
-        {
-            Ultracraft.LOGGER.error("[ULTRACRAFT] Failed to fetch Supporters.");
-            supporterCache.put(uuid, 600);
-            return supporter;
-        }
-        supporter = JsonHelper.hasElement(json, uuid.toString());
-        if(supporter && client)
-        {
-            Ultracraft.LOGGER.info("[ULTRACRAFT] " + uuid + " has been verified as a Supporter!");
-            supporterCache.put(uuid, -1);
-        }
-        else
-            supporterCache.put(uuid, 600); //if not a supporter, only check again after 30 seconds
-        return supporter;
+        //Supporter checking is disabled: never contact GitHub (a failed/blocked request could freeze the game) and
+        //always treat everyone as a non-supporter.
+        return false;
     }
-    
+
     public static JsonObject fetchSupporterList()
     {
-        try
-        {
-            URL url = new URL(SUPPORTER_LIST);
-            return JsonHelper.deserialize(new InputStreamReader(url.openStream()));
-        }
-        catch (IOException e)
-        {
-            Ultracraft.LOGGER.error("[ULTRACRAFT] Failed to fetch Supporters.", e);
-        }
+        //Disabled: never fetch the supporter list from GitHub. Returning null is handled gracefully by all callers.
         return null;
     }
     

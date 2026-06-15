@@ -60,7 +60,8 @@ public abstract class HandRendererMixin
 		ClientConfig config = UltracraftClient.getConfig();
 		if(config.onlyShowArmWhilePunching && !playerAccessor.IsPunching())
 			return;
-		if(hand == Hand.OFF_HAND && (playerAccessor.IsPunching() || !item.isEmpty()))
+		//Only take over the offhand for the punch animation; when simply holding an item, let vanilla render it normally.
+		if(hand == Hand.OFF_HAND && playerAccessor.IsPunching())
 		{
 			RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
 			if(item.getItem() instanceof AbstractWeaponItem)

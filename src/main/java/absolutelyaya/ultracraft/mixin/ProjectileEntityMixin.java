@@ -51,7 +51,7 @@ public abstract class ProjectileEntityMixin extends Entity implements Projectile
 	
 	private static final TrackedData<Integer> PARRIES = DataTracker.registerData(ProjectileEntity.class, TrackedDataHandlerRegistry.INTEGER);
 	protected PlayerEntity parrier, knockbackExplosionCauser;
-	boolean frozen, boosted;
+	boolean frozen, boosted, touchingHittableLastTick;
 	Vec3d preFreezeVel;
 	Consumer<Integer> onParried;
 	Supplier<Boolean> isParriable = () -> true;
@@ -110,9 +110,21 @@ public abstract class ProjectileEntityMixin extends Entity implements Projectile
 		if(!leftOwner)
 		{
 			List<Entity> entities = getWorld().getOtherEntities(owner, getBoundingBox().stretch(this.getVelocity()), this::canHit);
-			if(entities.size() > 0)
-				onCollision(new EntityHitResult(entities.get(0)));
+			//Only trigger a collision on the rising edge of contact (one hit per contact) instead of every tick. Without
+			//this, a projectile that lingers in contact with an entity while still near its owner — e.g. an owner-attached
+			//or orbiting projectile from another mod (like SlashBlade's phantom sword) that never sets leftOwner — would
+			//call onCollision every single tick and deal per-tick damage instead of a single hit.
+			if(!entities.isEmpty())
+			{
+				if(!touchingHittableLastTick)
+					onCollision(new EntityHitResult(entities.get(0)));
+				touchingHittableLastTick = true;
+			}
+			else
+				touchingHittableLastTick = false;
 		}
+		else
+			touchingHittableLastTick = false;
 	}
 	
 	@Inject(method = "updateRotation()V", at = @At("HEAD"), cancellable = true)

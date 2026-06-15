@@ -220,7 +220,8 @@ public abstract class PlayerEntityMixin extends LivingEntity implements WingedPl
 	@ModifyReturnValue(method = "isSwimming", at = @At("RETURN"))
 	boolean onIsSwimming(boolean original)
 	{
-		return original && !isWingsActive();
+		//Hi-vel mode normally suppresses swimming, but allow it while in water so the player uses the vanilla swim pose.
+		return original && (!isWingsActive() || isTouchingWater());
 	}
 	
 	@ModifyReturnValue(method = "shouldSwimInFluids", at = @At("RETURN"))
@@ -359,6 +360,11 @@ public abstract class PlayerEntityMixin extends LivingEntity implements WingedPl
 	void onTickMovement(CallbackInfo ci)
 	{
 		IHivelComponent hivel = UltraComponents.HIVEL.get(this);
+		//In hi-vel mode, automatically use the vanilla swimming pose in water: start when the head submerges and keep
+		//swimming while touching water (like vanilla). Skipped while dashing/sliding, which have their own poses. The
+		//fast hi-vel water physics is left untouched.
+		if(isWingsActive() && !abilities.flying && !hivel.isDashing() && !hivel.isSliding())
+			setSwimming(isSwimming() ? isTouchingWater() : isSubmergedInWater());
 		if(hivel.getDashingTicks() >= -1)
 		{
 			Vec3d dir = getVelocity();
@@ -483,7 +489,8 @@ public abstract class PlayerEntityMixin extends LivingEntity implements WingedPl
 	@Override
 	public boolean canBreatheInWater()
 	{
-		return isWingsActive() && !HivelConfig.INSTANCE.drowning.getValue();
+		//In hi-vel mode never consume oxygen / drown, regardless of the drowning config.
+		return isWingsActive();
 	}
 	
 	@Override

@@ -51,12 +51,8 @@ public abstract class SkinOptionsScreenMixin extends GameOptionsScreen
 			b.active = false;
 			b.setTooltip(Tooltip.of(Text.translatable("screen.ultracraft.wing-settings.only-in-world")));
 		}
-		//if(UltracraftClient.IRIS)
-		//{
-		//	b.active = false;
-		//	b.setTooltip(Tooltip.of(Text.translatable("screen.ultracraft.wing-settings.iris")));
-		//}
-	}
+        b.active = false;
+    }
 	
 	@ModifyVariable(method = "init", ordinal = 0, at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/screen/option/SkinOptionsScreen;addDrawableChild(Lnet/minecraft/client/gui/Element;)Lnet/minecraft/client/gui/Element;", ordinal = 1))
 	int modifyButtonCount(int i)

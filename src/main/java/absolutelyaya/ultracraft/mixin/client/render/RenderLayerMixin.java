@@ -16,10 +16,11 @@ public abstract class RenderLayerMixin
 	@ModifyReturnValue(method = "getBlockLayers", at = @At("RETURN"))
 	private static List<RenderLayer> onGetBlockLayers(List<RenderLayer> original)
 	{
-		if(UltracraftClient.SODIUM)
-			return original;
-		List<RenderLayer> layers = new ArrayList<>(original);
-		layers.add(RenderLayers.getFlesh());
-		return layers;
+        return original;
+//		if(UltracraftClient.SODIUM)
+//			return original;
+//		List<RenderLayer> layers = new ArrayList<>(original);
+//		layers.add(RenderLayers.getFlesh());
+//		return layers;
 	}
 }

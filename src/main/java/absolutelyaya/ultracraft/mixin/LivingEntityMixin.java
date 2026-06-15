@@ -269,7 +269,9 @@ public abstract class LivingEntityMixin extends Entity implements LivingEntityAc
 			if (hasStatusEffect(StatusEffects.DOLPHINS_GRACE))
 				f = 0.96f;
 		}
-		updateVelocity(g, movementInput);
+		//Extra hi-vel swim speed: equivalent to Forge's swim_speed attribute at 1.7 (it multiplies the swim acceleration).
+		float swimSpeed = fluidState.isIn(FluidTags.WATER) ? 1.7f : 1f;
+		updateVelocity(g * swimSpeed, movementInput);
 		move(MovementType.SELF, getVelocity());
 		Vec3d vec3d = getVelocity();
 		if (horizontalCollision && isClimbing())
@@ -328,7 +330,7 @@ public abstract class LivingEntityMixin extends Entity implements LivingEntityAc
 	@Inject(method = "tickMovement", at = @At(value = "INVOKE", target = "Lnet/minecraft/entity/LivingEntity;shouldSwimInFluids()Z"))
 	void onTickMovement(CallbackInfo ci)
 	{
-		if (this instanceof WingedPlayerEntity winged && UltraComponents.WING_DATA.get(winged).isActive() && isOnGround() && jumping && jumpingCooldown == 0)
+		if (this instanceof WingedPlayerEntity winged && UltraComponents.WING_DATA.get(winged).isActive() && isOnGround() && jumping && jumpingCooldown == 0 && !isTouchingWater())
 		{
 			jump();
 			jumpingCooldown = 10;

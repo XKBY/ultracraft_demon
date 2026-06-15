@@ -26,6 +26,16 @@ public class IngameHudMixin
 			ci.cancel();
 	}
 	
+	//Render the UltraHUD at the very start of the HUD pass. This runs after the first-person hand (so it covers the
+	//offhand item) but before all HUD content incl. chat and info popups (so those stay on top). Using HEAD of render()
+	//instead of an INVOKE point keeps it working under Sinytra Connector/Forge, where Forge moves chat rendering into a
+	//separate GUI overlay and the "before ChatHud.render" injection point no longer exists.
+	@Inject(method="render", at = @At("HEAD"))
+	void onRenderHudHead(DrawContext context, float tickDelta, CallbackInfo ci)
+	{
+		UltracraftClient.renderUltraHud(tickDelta);
+	}
+
 	@Inject(method="render", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/hud/ChatHud;render(Lnet/minecraft/client/gui/DrawContext;III)V", shift = At.Shift.BEFORE))
 	void beforeRenderChat(DrawContext context, float tickDelta, CallbackInfo ci)
 	{

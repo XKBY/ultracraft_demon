@@ -49,7 +49,6 @@
     "client.gui.ClickableWidgetMixin",
     "client.gui.DeathScreenMixin",
     "client.gui.DownloadingTerrainScreenMixin",
-    "client.gui.GameMenuScreenMixin",
     "client.gui.IngameHudMixin",
     "client.gui.ItemOverlayMixin",
     "client.gui.SkinOptionsScreenMixin",

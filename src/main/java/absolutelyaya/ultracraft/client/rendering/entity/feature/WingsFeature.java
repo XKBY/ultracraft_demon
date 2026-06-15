@@ -74,32 +74,27 @@ public class WingsFeature<T extends PlayerEntity, M extends PlayerEntityModel<T>
 			matrices.multiply(new Quaternionf(new AxisAngle4f(transform.pitch, 1f, 0f, 0f)));
 			matrices.multiply(new Quaternionf(new AxisAngle4f(transform.yaw, 0f, 1f, 0f)));
 			matrices.multiply(new Quaternionf(new AxisAngle4f(transform.roll, 0f, 0f, 1f)));
-			if(UltracraftClient.IRIS)
-			{
-				vertexConsumer = vertexConsumers.getBuffer(RenderLayers.getEntityCutout(TEXTURE_WNG));
-				Vector3f clr = clrs[0];
-				wingsModel.render(matrices, vertexConsumer, 15728880,
-						OverlayTexture.DEFAULT_UV, clr.x / 255f, clr.y / 255f, clr.z / 255f, 1f);
-				vertexConsumer = vertexConsumers.getBuffer(RenderLayers.getEntityCutout(TEXTURE_MTL));
-				clr = clrs[1];
-				wingsModel.render(matrices, vertexConsumer, light,
-						OverlayTexture.DEFAULT_UV, clr.x / 255f, clr.y / 255f, clr.z / 255f, 1f);
-			}
-			else
-			{
-				String patternID = wings.getPattern();
-				String overlayID = wings.getOverlay();
-				WingPatterns.Pattern p = null;
-				if(!patternID.isEmpty())
+            vertexConsumer = vertexConsumers.getBuffer(RenderLayers.getEntityCutout(TEXTURE_WNG));
+            Vector3f clr = clrs[0];
+            wingsModel.render(matrices, vertexConsumer, 15728880,
+                    OverlayTexture.DEFAULT_UV, clr.x / 255f, clr.y / 255f, clr.z / 255f, 1f);
+            vertexConsumer = vertexConsumers.getBuffer(RenderLayers.getEntityCutout(TEXTURE_MTL));
+            clr = clrs[1];
+            wingsModel.render(matrices, vertexConsumer, light,
+            OverlayTexture.DEFAULT_UV, clr.x / 255f, clr.y / 255f, clr.z / 255f, 1f);
+			String patternID = wings.getPattern();
+            String overlayID = wings.getOverlay();
+            WingPatterns.Pattern p = null;
+            if(!patternID.isEmpty())
 					p = WingPatterns.getAnimated(patternID);
-				ShaderProgram wingShader = p == null ? UltracraftClient.getWingsColoredShaderProgram() : p.program().get();
-				wingShader.getUniform("WingColor").set(clrs[0]);
-				wingShader.getUniform("MetalColor").set(clrs[1]);
-				RenderSystem.setShader(p == null ? UltracraftClient::getWingsColoredShaderProgram : p.program());
-				vertexConsumer = vertexConsumers.getBuffer(RenderLayers.getWingsPattern(TEXTURE_CLR, patternID));
-				RenderSystem.setShaderTexture(1, Ultracraft.identifier("textures/entity/wing_overlay/" + overlayID + ".png"));
-				wingsModel.render(matrices, vertexConsumer, light, OverlayTexture.DEFAULT_UV, 1f, 1f, 1f, 1f);
-			}
+            ShaderProgram wingShader = p == null ? UltracraftClient.getWingsColoredShaderProgram() : p.program().get();
+            wingShader.getUniform("WingColor").set(clrs[0]);
+            wingShader.getUniform("MetalColor").set(clrs[1]);
+            RenderSystem.setShader(p == null ? UltracraftClient::getWingsColoredShaderProgram : p.program());
+            vertexConsumer = vertexConsumers.getBuffer(RenderLayers.getWingsPattern(TEXTURE_CLR, patternID));
+            RenderSystem.setShaderTexture(1, Ultracraft.identifier("textures/entity/wing_overlay/" + overlayID + ".png"));
+            wingsModel.render(matrices, vertexConsumer, light, OverlayTexture.DEFAULT_UV, 1f, 1f, 1f, 1f);
+
 			matrices.pop();
 			RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
 		}
